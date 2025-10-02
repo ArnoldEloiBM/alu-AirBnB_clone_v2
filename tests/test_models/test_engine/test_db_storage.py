@@ -1,103 +1,84 @@
 #!/usr/bin/python3
-import unittest
-import models
-from models.user import User
-from models.review import Review
+"""Defines the DBStorage engine."""
+from os import getenv
+from models.base_model import Base
+from models.base_model import BaseModel
 from models.amenity import Amenity
-from models.state import State
-from models.place import Place
 from models.city import City
-import os
+from models.place import Place
+from models.review import Review
+from models.state import State
+from models.user import User
+from sqlalchemy import create_engine
+from sqlalchemy.orm import relationship
+from sqlalchemy.orm import scoped_session
+from sqlalchemy.orm import sessionmaker
 
 
-# skip these test if the storage is not db
-@unittest.skipIf(os.getenv('HBNB_TYPE_STORAGE') != 'db', "skip if not fs")
-class TestDBStorage(unittest.TestCase):
-    """DB Storage test"""
+class DBStorage:
+    """Represents a database storage engine.
 
-    def setUp(self):
-        """ Set up test environment """
-        self.storage = models.storage
+    Attributes:
+        __engine (sqlalchemy.Engine): The working SQLAlchemy engine.
+        __session (sqlalchemy.Session): The working SQLAlchemy session.
+    """
 
-    def tearDown(self):
-        """ Remove storage file at end of tests """
-        del self.storage
+    __engine = None
+    __session = None
 
-    def test_user(self):
-        """ Tests user """
-        user = User(name="Chyna", email="chyna@gmail.com", password="Chyna12345")
-        user.save()
-        self.assertFalse(user.id in self.storage.all())
-        self.assertEqual(user.name, "Chyna")
+    def __init__(self):
+        """Initialize a new DBStorage instance."""
+        self.__engine = create_engine("mysql+mysqldb://{}:{}@{}/{}".
+                                      format(getenv("HBNB_MYSQL_USER"),
+                                             getenv("HBNB_MYSQL_PWD"),
+                                             getenv("HBNB_MYSQL_HOST"),
+                                             getenv("HBNB_MYSQL_DB")),
+                                      pool_pre_ping=True)
+        if getenv("HBNB_ENV") == "test":
+            Base.metadata.drop_all(self.__engine)
 
-    def test_city(self):
-        """ test city """
-        state = State(name="California")
-        state.save()
-        city = City(name="Batch")
-        city.state_id = state.id
-        city.save()
-        self.assertFalse(city.id in self.storage.all())
-        self.assertEqual(city.name, "Batch")
+    def all(self, cls=None):
+        """Query on the curret database session all objects of the given class.
 
-    def test_state(self):
-        """ test state"""
-        state = State(name="California")
-        state.save()
-        self.assertFalse(state.id in self.storage.all())
-        self.assertEqual(state.name, "California")
+        If cls is None, queries all types of objects.
 
-    def test_place(self):
-        """Test place"""
-        state = State(name="California")
-        state.save()
+        Return:
+            Dict of queried classes in the format <class name>.<obj id> = obj.
+        """
+        if cls is None:
+            objs = self.__session.query(State).all()
+            objs.extend(self.__session.query(City).all())
+            objs.extend(self.__session.query(User).all())
+            objs.extend(self.__session.query(Place).all())
+            objs.extend(self.__session.query(Review).all())
+            objs.extend(self.__session.query(Amenity).all())
+        else:
+            if type(cls) == str:
+                cls = eval(cls)
+            objs = self.__session.query(cls)
+        return {"{}.{}".format(type(o).__name__, o.id): o for o in objs}
 
-        city = City(name="Batch")
-        city.state_id = state.id
-        city.save()
+    def new(self, obj):
+        """Add obj to the current database session."""
+        self.__session.add(obj)
 
-        user = User(name="Chyna", email="chyna@gmail.com", password="Chyna12345")
-        user.save()
+    def save(self):
+        """Commit all changes to the current database session."""
+        self.__session.commit()
 
-        place = Place(name="Palace", number_rooms=4)
-        place.city_id = city.id
-        place.user_id = user.id
-        place.save()
+    def delete(self, obj=None):
+        """Delete obj from the current database session."""
+        if obj is not None:
+            self.__session.delete(obj)
 
-        self.assertFalse(place.id in self.storage.all())
-        self.assertEqual(place.number_rooms, 4)
-        self.assertEqual(place.name, "Palace")
+    def reload(self):
+        """Create all tables in the database and initialize a new session."""
+        Base.metadata.create_all(self.__engine)
+        session_factory = sessionmaker(bind=self.__engine,
+                                       expire_on_commit=False)
+        Session = scoped_session(session_factory)
+        self.__session = Session()
 
-    def test_amenity(self):
-        """ test amenity """
-        amenity = Amenity(name="Startlink")
-        amenity.save()
-        self.assertFalse(amenity.id in self.storage.all())
-        self.assertTrue(amenity.name, "Startlink")
-
-    def test_review(self):
-        """ test review """
-        state = State(name="California")
-        state.save()
-
-        city = City(name="Batch")
-        city.state_id = state.id
-        city.save()
-
-        user = User(name="Chyna", email="chyna@gmail.com", password="Chyna12345")
-        user.save()
-
-        place = Place(name="Palace", number_rooms=4)
-        place.city_id = city.id
-        place.user_id = user.id
-        place.save()
-
-        review = Review(text="no comment", place_id=place.id, user_id=user.id)
-        review.save()
-
-        self.assertFalse(review.id in self.storage.all())
-        self.assertEqual(review.text, "no comment")
-
-
-if __name__ == '__main__':
-    unittest.main()
+    def close(self):
+        """Close the working SQLAlchemy session."""
+        self.__session.close()
