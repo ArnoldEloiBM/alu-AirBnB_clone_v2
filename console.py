@@ -2,7 +2,6 @@
 """ Console Module """
 import cmd
 import sys
-import shlex
 from models.base_model import BaseModel
 from models.__init__ import storage
 from models.user import User
@@ -116,52 +115,28 @@ class HBNBCommand(cmd.Cmd):
 
     def do_create(self, args):
         """ Create an object of any class"""
+        split_args = args.split(' ')
         if not args:
             print("** class name missing **")
             return
-
-        # split respecting quoted strings
-        try:
-            tokens = shlex.split(args)
-        except ValueError:
-            # malformed string
-            tokens = args.split()
-
-        cls_name = tokens[0]
-        if cls_name not in HBNBCommand.classes:
+        elif split_args[0] not in HBNBCommand.classes:
             print("** class doesn't exist **")
             return
 
+        # Handle args parameters
         new_dict = {}
-        # original args string used to detect quoted values
-        original = args
-        for token in tokens[1:]:
-            if '=' not in token:
-                continue
-            key, value = token.split('=', 1)
-            # determine if this key was quoted in original args
-            quoted_pattern = key + '="'
-            if quoted_pattern in original:
-                # shlex removed quotes; restore string and replace underscores
-                value = value.replace('_', ' ')
-            else:
-                # try to cast to int or float, otherwise leave as is
-                if value.isdigit() or (value.startswith('-') and value[1:].isdigit()):
-                    try:
-                        value = int(value)
-                    except Exception:
-                        pass
+        if len(split_args) > 1:
+            for arg in split_args[1:]:
+                key, value = arg.split('=')
+                if value[0] == '"':
+                    value = value.strip('"').replace('_', ' ')
                 else:
                     try:
-                        # float conversion
-                        if '.' in value:
-                            value = float(value)
-                    except Exception:
-                        # fallback: keep original token value
-                        pass
-            new_dict[key] = value
-
-        new_instance = HBNBCommand.classes[cls_name](**new_dict)
+                        value = eval(value)
+                    except NameError or SyntaxError:
+                        continue
+                new_dict[key] = value
+        new_instance = HBNBCommand.classes[split_args[0]](**new_dict)
         storage.new(new_instance)
         print(new_instance.id)
         storage.save()
@@ -363,4 +338,3 @@ class HBNBCommand(cmd.Cmd):
 
 if __name__ == "__main__":
     HBNBCommand().cmdloop()
-    
