@@ -2,7 +2,6 @@
 """ Console Module """
 import cmd
 import sys
-import shlex
 from models.base_model import BaseModel
 from models.__init__ import storage
 from models.user import User
@@ -116,63 +115,36 @@ class HBNBCommand(cmd.Cmd):
 
     def do_create(self, args):
         """ Create an object of any class"""
+        split_args = args.split(' ')
         if not args:
             print("** class name missing **")
             return
-            
-        # Split args properly handling quotes
-        try:
-            args_list = shlex.split(args)
-        except ValueError:
-            print("** invalid syntax **")
-            return
-            
-        class_name = args_list[0]
-        
-        if class_name not in HBNBCommand.classes:
+        elif split_args[0] not in HBNBCommand.classes:
             print("** class doesn't exist **")
             return
 
-        # Parse parameters
-        params = {}
-        for arg in args_list[1:]:
-            if '=' in arg:
-                key, value = arg.split('=', 1)
-                
-                # Remove quotes if present and handle string values
-                if value.startswith('"') and value.endswith('"'):
-                    value = value[1:-1]
-                    # Replace underscores with spaces for string values
-                    value = value.replace('_', ' ').replace('\\"', '"')
-                    params[key] = value
+        # Handle args parameters
+        new_dict = {}
+        if len(split_args) > 1:
+            for arg in split_args[1:]:
+                key, value = arg.split('=')
+                if value[0] == '"':
+                    value = value.strip('"').replace('_', ' ')
                 else:
-                    # Try to convert to int or float
                     try:
-                        if '.' in value:
-                            params[key] = float(value)
-                        else:
-                            params[key] = int(value)
-                    except ValueError:
-                        # If conversion fails, skip this parameter
+                        value = eval(value)
+                    except NameError or SyntaxError:
                         continue
-
-        # Create instance
-        try:
-            if params:
-                new_instance = HBNBCommand.classes[class_name](**params)
-            else:
-                new_instance = HBNBCommand.classes[class_name]()
-            
-            new_instance.save()
-            print(new_instance.id)
-        except Exception as e:
-            print("** error creating instance **")
-            return
+                new_dict[key] = value
+        new_instance = HBNBCommand.classes[split_args[0]](**new_dict)
+        storage.new(new_instance)
+        print(new_instance.id)
+        storage.save()
 
     def help_create(self):
         """ Help information for the create method """
         print("Creates a class of any type")
-        print("[Usage]: create <className> <key>=<value> <key2>=<value2> ...\n")
+        print("[Usage]: create <className>\n")
 
     def do_show(self, args):
         """ Method to show an individual object """
@@ -249,7 +221,7 @@ class HBNBCommand(cmd.Cmd):
             if args not in HBNBCommand.classes:
                 print("** class doesn't exist **")
                 return
-            for k, v in storage.all().items():
+            for k, v in storage.all(eval(args)).items():
                 if k.split('.')[0] == args:
                     print_list.append(str(v))
         else:
