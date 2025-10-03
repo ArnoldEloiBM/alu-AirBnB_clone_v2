@@ -2,6 +2,7 @@
 """ Console Module """
 import cmd
 import sys
+import shlex
 from models.base_model import BaseModel
 from models.__init__ import storage
 from models.user import User
@@ -119,46 +120,54 @@ class HBNBCommand(cmd.Cmd):
             print("** class name missing **")
             return
             
-        split_args = args.split(' ')
-        class_name = split_args[0]
+        # Split args properly handling quotes
+        try:
+            args_list = shlex.split(args)
+        except ValueError:
+            print("** invalid syntax **")
+            return
+            
+        class_name = args_list[0]
         
         if class_name not in HBNBCommand.classes:
             print("** class doesn't exist **")
             return
 
-        # Handle parameters
-        new_dict = {}
-        if len(split_args) > 1:
-            for arg in split_args[1:]:
-                if '=' in arg:
-                    key, value = arg.split('=', 1)
-                    
-                    # Handle string values (enclosed in quotes)
-                    if value.startswith('"') and value.endswith('"'):
-                        value = value[1:-1].replace('_', ' ').replace('\\"', '"')
-                    # Handle float values
-                    elif '.' in value:
-                        try:
-                            value = float(value)
-                        except ValueError:
-                            continue
-                    # Handle integer values
-                    else:
-                        try:
-                            value = int(value)
-                        except ValueError:
-                            continue
-                    
-                    new_dict[key] = value
+        # Parse parameters
+        params = {}
+        for arg in args_list[1:]:
+            if '=' in arg:
+                key, value = arg.split('=', 1)
+                
+                # Remove quotes if present and handle string values
+                if value.startswith('"') and value.endswith('"'):
+                    value = value[1:-1]
+                    # Replace underscores with spaces for string values
+                    value = value.replace('_', ' ').replace('\\"', '"')
+                    params[key] = value
+                else:
+                    # Try to convert to int or float
+                    try:
+                        if '.' in value:
+                            params[key] = float(value)
+                        else:
+                            params[key] = int(value)
+                    except ValueError:
+                        # If conversion fails, skip this parameter
+                        continue
 
-        # Create instance with or without parameters
-        if new_dict:
-            new_instance = HBNBCommand.classes[class_name](**new_dict)
-        else:
-            new_instance = HBNBCommand.classes[class_name]()
+        # Create instance
+        try:
+            if params:
+                new_instance = HBNBCommand.classes[class_name](**params)
+            else:
+                new_instance = HBNBCommand.classes[class_name]()
             
-        new_instance.save()
-        print(new_instance.id)
+            new_instance.save()
+            print(new_instance.id)
+        except Exception as e:
+            print("** error creating instance **")
+            return
 
     def help_create(self):
         """ Help information for the create method """
