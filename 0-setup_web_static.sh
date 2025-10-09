@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-<<<<<<< HEAD
+
 # This script sets up a web servers for the deployment of web_static hbnb
 
 # installing nginx
@@ -80,5 +80,4 @@ sudo chown -R ubuntu:ubuntu /data/
 
 sudo sed -i '/listen 80 default_server/a location /hbnb_static { alias /data/web_static/current/;}' /etc/nginx/sites-enabled/default
 
->>>>>>> dcde87c933c4be9ecb1e98b7406cfe1fce5311ec
 sudo service nginx restart
