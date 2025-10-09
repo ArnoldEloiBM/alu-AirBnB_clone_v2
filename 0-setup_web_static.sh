@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+<<<<<<< HEAD
 # This script sets up a web servers for the deployment of web_static hbnb
 
 # installing nginx
@@ -53,4 +54,31 @@ sudo chown -R ubuntu:ubuntu /data/
 sudo sed -i "/server_name/a\        location /hbnb_static {\n                alias /data/web_static/current/;\n        }" /etc/nginx/sites-available/default
 
 #updating nginx
+=======
+#Setting up web servers for the web_static deployment
+sudo apt-get update
+sudo apt-get -y install nginx
+sudo ufw allow 'Nginx HTTP'
+
+sudo mkdir -p /data/
+sudo mkdir -p /data/web_static/
+sudo mkdir -p /data/web_static/releases/
+sudo mkdir -p /data/web_static/shared/
+sudo mkdir -p /data/web_static/releases/test/
+sudo touch /data/web_static/releases/test/index.html
+sudo echo "<html>
+  <head>
+  </head>
+  <body>
+    Holberton School
+  </body>
+</html>" | sudo tee /data/web_static/releases/test/index.html
+
+sudo ln -s -f /data/web_static/releases/test/ /data/web_static/current
+
+sudo chown -R ubuntu:ubuntu /data/
+
+sudo sed -i '/listen 80 default_server/a location /hbnb_static { alias /data/web_static/current/;}' /etc/nginx/sites-enabled/default
+
+>>>>>>> dcde87c933c4be9ecb1e98b7406cfe1fce5311ec
 sudo service nginx restart
